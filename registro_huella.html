@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>RIɢHA | Vincular huella</title>
+<style>
+body{font-family:Arial;margin:0;background:#f4f7f5}.wrap{min-height:100vh;display:grid;place-items:center;padding:24px}.card{background:#fff;padding:35px;border-radius:24px;width:min(620px,100%);box-shadow:0 18px 55px #0002}h1{color:#006b35}input{width:100%;padding:16px;font-size:26px;box-sizing:border-box;text-align:center;border:2px solid #ddd;border-radius:12px}button{width:100%;padding:17px;margin-top:14px;border:0;border-radius:12px;background:#006b35;color:#fff;font-weight:800;font-size:19px}#s{margin-top:18px;padding:14px;border-radius:12px;background:#eef5f0;font-weight:700}</style></head>
+<body><div class="wrap"><div class="card"><h1>RIɢHA · Vincular huella</h1><p>Ingrese el documento del empleado. Luego Windows Hello pedirá la huella.</p>
+<input id="doc" inputmode="numeric" maxlength="15" placeholder="Documento"><button id="go">REGISTRAR HUELLA</button><div id="s">LISTO</div></div></div>
+<script>
+const API="https://script.google.com/macros/s/AKfycbwFlanjBT2NHv6ikVUfvk1xz0w-0CjyrWRE207Bmjjvo91MoQhOY6Z7RTkv1qwsxK3l/exec",CLAVE="RIGHA-WA-2026",RP_ID=location.hostname;
+function b64uToBytes(s){s=s.replace(/-/g,'+').replace(/_/g,'/');while(s.length%4)s+='=';const bin=atob(s);return Uint8Array.from(bin,c=>c.charCodeAt(0));}
+function bytesToB64u(buf){const bytes=new Uint8Array(buf);let s='';for(const b of bytes)s+=String.fromCharCode(b);return btoa(s).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');}
+function rand(n=32){const a=new Uint8Array(n);crypto.getRandomValues(a);return a}
+function jsonp(params){return new Promise((resolve,reject)=>{const cb='cb_'+Date.now()+'_'+Math.random().toString(36).slice(2);const s=document.createElement('script');params.callback=cb;s.src=API+'?'+new URLSearchParams(params);window[cb]=v=>{delete window[cb];s.remove();resolve(v)};s.onerror=()=>reject(new Error('No se pudo comunicar con RIɢHA'));document.body.appendChild(s)})}
+const d=document.getElementById('doc'),s=document.getElementById('s'),b=document.getElementById('go');
+b.onclick=async()=>{const doc=d.value.replace(/\D/g,'');if(!/^\d{5,15}$/.test(doc)){s.textContent='Documento inválido';return};b.disabled=true;s.textContent='Verificando empleado...';
+try{const info=await jsonp({api:'credencial',documento:doc,clave:CLAVE});if(!info.ok)throw Error(info.message);s.textContent='COLOQUE EL DEDO...';
+const uid=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(doc));const cred=await navigator.credentials.create({publicKey:{
+challenge:rand(),rp:{name:'RIɢHA',id:RP_ID},user:{id:new Uint8Array(uid),name:doc,displayName:info.nombre},
+pubKeyCredParams:[{type:'public-key',alg:-7}],authenticatorSelection:{authenticatorAttachment:'platform',residentKey:'discouraged',userVerification:'required'},timeout:30000
+}});
+if(!cred)throw Error('Windows Hello no devolvió una credencial.');
+const id=bytesToB64u(cred.rawId);const r=await jsonp({api:'guardarCredencial',documento:doc,credentialId:id,clave:CLAVE});if(!r.ok)throw Error(r.message);
+s.textContent='HUELLA VINCULADA: '+(r.nombre||info.nombre);s.style.background='#dff6e7';d.value='';b.disabled=false;d.focus();
+}catch(e){s.textContent=e.name==='NotAllowedError'?'Operación cancelada.':e.message;s.style.background='#ffe5e5';b.disabled=false}};
+d.focus();
+</script></body></html>
